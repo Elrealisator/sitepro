@@ -31,21 +31,21 @@ const Contact: React.FC = () => {
     {
       icon: Mail,
       title: 'Email',
-      value: 'contact@elrealisator.com',
+      value: 'divantchuisseu@gmail.com',
       description: 'Réponse sous 24h',
       color: 'bg-blue-100 text-blue-600'
     },
     {
       icon: Phone,
       title: 'Téléphone',
-      value: '+33 6 12 34 56 78',
+      value: '+237 6 56 48 15 31',
       description: 'Lun-Ven 9h-18h',
       color: 'bg-green-100 text-green-600'
     },
     {
       icon: MapPin,
       title: 'Localisation',
-      value: 'France, Télétravail',
+      value: 'Cameroun, Télétravail',
       description: 'Projets à distance',
       color: 'bg-purple-100 text-purple-600'
     }
