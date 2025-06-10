@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle, Clock, MessageSquare } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle, Clock, MessageSquare, AlertCircle } from 'lucide-react'; // Ajout de AlertCircle pour les erreurs
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,19 +12,63 @@ const Contact: React.FC = () => {
   });
 
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Nouveau : pour l'état de chargement
+  const [submissionError, setSubmissionError] = useState<string | null>(null); // Nouveau : pour la gestion des erreurs
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    setSubmissionError(null); // Efface les erreurs lors de la modification d'un champ
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate form submission
-    setIsSubmitted(true);
-    setTimeout(() => setIsSubmitted(false), 3000);
+    setIsSubmitting(true); // Active l'état de chargement
+    setSubmissionError(null); // Efface les erreurs précédentes
+
+    // Validation côté client (basique)
+    if (!formData.name || !formData.email || !formData.subject || !formData.message) {
+      setSubmissionError("Veuillez remplir tous les champs obligatoires marqués d'un *.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // Netlify Forms utilise un format spécifique pour les requêtes AJAX.
+      // Nous allons utiliser le format URL-encoded pour la simplicité avec le traitement de Netlify Forms.
+      const encode = (data: Record<string, string>) => {
+        return Object.keys(data)
+          .map(key => encodeURIComponent(key) + "=" + encodeURIComponent(data[key]))
+          .join("&");
+      };
+
+      // Envoi des données à Netlify Forms
+      const response = await fetch("/", { // L'URL "/" est interceptée par Netlify pour ses formulaires
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, // Nécessaire pour Netlify Forms
+        body: encode({
+          "form-name": "contact", // IMPORTANT : Ceci doit correspondre à l'attribut 'name' d'un formulaire HTML conceptuel pour Netlify
+          ...formData,
+        }),
+      });
+
+      if (response.ok) {
+        setIsSubmitted(true);
+        setFormData({ name: '', email: '', subject: '', message: '', budget: '', timeline: '' }); // Réinitialise le formulaire
+        setTimeout(() => setIsSubmitted(false), 5000); // Cache le message de succès après 5 secondes
+      } else {
+        const errorText = await response.text();
+        console.error("Erreur de soumission du formulaire Netlify :", response.status, errorText);
+        setSubmissionError("Une erreur est survenue lors de l'envoi. Veuillez réessayer plus tard.");
+      }
+    } catch (error) {
+      console.error("Erreur réseau ou de soumission :", error);
+      setSubmissionError("Problème de connexion. Veuillez vérifier votre réseau.");
+    } finally {
+      setIsSubmitting(false); // Désactive l'état de chargement
+    }
   };
 
   const contactInfo = [
@@ -69,19 +113,19 @@ const Contact: React.FC = () => {
   return (
     <section className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+        {/* En-tête de la section */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             Contactez-moi
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Vous avez un projet en tête ? Discutons-en ! Je suis là pour vous accompagner 
+            Vous avez un projet en tête ? Discutons-en ! Je suis là pour vous accompagner
             et transformer vos idées en réalité.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Contact Form */}
+          {/* Formulaire de contact */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl p-8 shadow-lg">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -101,7 +145,15 @@ const Contact: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6" name="contact" data-netlify="true" netlify-honeypot="bot-field">
+                  {/* Champ caché pour Netlify Honeypot (anti-spam) */}
+                  <input type="hidden" name="form-name" value="contact" />
+                  <p hidden>
+                    <label>
+                      Ne remplissez pas ce champ : <input name="bot-field" onChange={handleChange} />
+                    </label>
+                  </p>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -116,6 +168,7 @@ const Contact: React.FC = () => {
                         onChange={handleChange}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         placeholder="Votre nom"
+                        aria-required="true" // Accessibilité
                       />
                     </div>
                     <div>
@@ -123,7 +176,7 @@ const Contact: React.FC = () => {
                         Email *
                       </label>
                       <input
-                        type="email"
+                        type="email" // Type email pour une meilleure validation du navigateur
                         id="email"
                         name="email"
                         required
@@ -131,6 +184,7 @@ const Contact: React.FC = () => {
                         onChange={handleChange}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         placeholder="votre@email.com"
+                        aria-required="true" // Accessibilité
                       />
                     </div>
                   </div>
@@ -146,6 +200,7 @@ const Contact: React.FC = () => {
                       value={formData.subject}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      aria-required="true" // Accessibilité
                     >
                       <option value="">Sélectionnez un service</option>
                       <option value="design">Design Graphique</option>
@@ -207,24 +262,47 @@ const Contact: React.FC = () => {
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
                       placeholder="Décrivez votre projet en détail..."
+                      aria-required="true" // Accessibilité
                     ></textarea>
                   </div>
 
+                  {/* Message d'erreur (si la soumission échoue ou validation client) */}
+                  {submissionError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
+                      <AlertCircle className="w-5 h-5 mr-2" />
+                      {submissionError}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full bg-blue-600 text-white font-semibold py-4 px-6 rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center group shadow-lg hover:shadow-xl"
+                    className="w-full bg-blue-600 text-white font-semibold py-4 px-6 rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center group shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSubmitting} // Désactive le bouton pendant la soumission
                   >
-                    Envoyer le message
-                    <Send className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                    {isSubmitting ? (
+                      <>
+                        Envoi en cours...
+                        {/* Optionnel : un spinner de chargement */}
+                        <svg className="animate-spin h-5 w-5 text-white ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </>
+                    ) : (
+                      <>
+                        Envoyer le message
+                        <Send className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                      </>
+                    )}
                   </button>
                 </form>
               )}
             </div>
           </div>
 
-          {/* Contact Info & FAQ */}
+          {/* Informations de contact et FAQ */}
           <div className="space-y-8">
-            {/* Contact Info */}
+            {/* Infos de contact */}
             <div className="bg-white rounded-3xl p-8 shadow-lg">
               <h3 className="text-xl font-bold text-gray-900 mb-6">
                 Informations de contact
@@ -265,7 +343,7 @@ const Contact: React.FC = () => {
               </div>
             </div>
 
-            {/* Response Time */}
+            {/* Temps de réponse */}
             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl p-8 border border-blue-100">
               <div className="flex items-center mb-4">
                 <Clock className="w-6 h-6 text-blue-600 mr-2" />
@@ -274,7 +352,7 @@ const Contact: React.FC = () => {
                 </h3>
               </div>
               <p className="text-gray-600">
-                Je m'engage à répondre à tous les messages dans les 
+                Je m'engage à répondre à tous les messages dans les
                 <span className="font-semibold text-blue-600"> 24 heures</span> suivant leur réception.
               </p>
             </div>
